@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+#------------------------------------------------------
+#  Parameter
+#------------------------------------------------------
+Parameters: 
+  ProjectName:
+    Type: String
+    Default: simple-nginx
+    Description: ProjectName
+  AMIId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  Ec2InstanceType:
+    Type: String
+    Default: t3.nano
+Resources: 
+#------------------------------------------------------
+#  KeyPair
+#------------------------------------------------------
+  KeyPair:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: KeypairWeb
+#------------------------------------------------------
+#  EC2
+#------------------------------------------------------
+  WebSeverInstace:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName:  !Ref KeyPair
+      ImageId: !Ref AMIId
+      InstanceType: !Ref Ec2InstanceType
+      Monitoring: false #詳細モニタリング オフ
+      UserData: !Base64 |
+        #!/bin/bash -ex
+        yum update -y
+        amazon-linux-extras install nginx1 -y
+        sudo timedatectl set-timezone Asia/Tokyo && sudo localectl set-locale LANG=ja_JP.utf8 && sudo localectl set-keymap jp106
+        export LANG=ja_JP.UTF-8
+        systemctl start nginx
+        systemctl enable nginx  
+      NetworkInterfaces:
+        - GroupSet:
+          - Fn::ImportValue: !Sub ${ProjectName}-sg
+          DeleteOnTermination: true
+          DeviceIndex: 0
+          SubnetId: 
+            Fn::ImportValue: !Sub ${ProjectName}-publicsubnet
+          AssociatePublicIpAddress: "true"  #自動割り当てパブリックIDの有効化
+      Tags:
+        - Key: key
+          Value: !Ref ProjectName
